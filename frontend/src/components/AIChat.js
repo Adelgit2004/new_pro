@@ -1,10 +1,6 @@
-const backendURL = "https://YOUR-BACKEND.onrender.com";
-
 export default function AIChat({ userText, language, setAiReply }) {
   const askAI = async () => {
-    if (!userText) return;
-
-    const res = await fetch(`${backendURL}/api/chat`, {
+    const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: userText, language }),
