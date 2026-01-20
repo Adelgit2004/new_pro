@@ -1,17 +1,24 @@
 import express from "express";
 import cors from "cors";
-import fetch from "node-fetch"; // or global fetch in Node 18+
+import fetch from "node-fetch"; // Node 18+ has fetch globally, but safe to import
+
+// Load environment variables
+import 'dotenv/config';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// AI chat endpoint
+// -------------------------
+// AI Chat Endpoint
+// -------------------------
 app.post("/api/chat", async (req, res) => {
   const { message, language } = req.body;
 
+  if (!message) return res.json({ reply: "Please enter a message" });
+
   try {
-    // You can integrate OpenAI or another LLM
+    // Build prompt for AI
     const prompt =
       language === "Malayalam"
         ? `Translate Malayalam to English and reply naturally: ${message}`
@@ -31,17 +38,23 @@ app.post("/api/chat", async (req, res) => {
     });
 
     const data = await openaiRes.json();
+
     const reply = data.choices?.[0]?.message?.content || "AI response not available";
+
     res.json({ reply });
   } catch (err) {
-    console.error(err);
+    console.error("Chat Error:", err);
     res.status(500).json({ reply: "AI response not available" });
   }
 });
 
-// TTS endpoint
+// -------------------------
+// Text-to-Speech Endpoint
+// -------------------------
 app.post("/api/tts", async (req, res) => {
   const { text, language } = req.body;
+
+  if (!text) return res.status(400).send("No text provided for TTS");
 
   const voices = {
     English: "EXAVITQu4vr4xnSDxMaL",
@@ -49,6 +62,7 @@ app.post("/api/tts", async (req, res) => {
     Spanish: "TxGEqnHWrfWFTfGW9XjX",
     Malayalam: "EXAVITQu4vr4xnSDxMaL",
   };
+
   const voiceId = voices[language] || voices.English;
 
   try {
@@ -65,13 +79,17 @@ app.post("/api/tts", async (req, res) => {
     });
 
     const audioBuffer = await ttsRes.arrayBuffer();
+
     res.set("Content-Type", "audio/mpeg");
     res.send(Buffer.from(audioBuffer));
   } catch (err) {
-    console.error(err);
+    console.error("TTS Error:", err);
     res.status(500).send("TTS failed");
   }
 });
 
+// -------------------------
+// Start Server
+// -------------------------
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
