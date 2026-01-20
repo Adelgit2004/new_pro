@@ -2,7 +2,7 @@ import { useState } from "react";
 import SpeechToText from "./components/SpeechToText";
 import LanguageSelector from "./components/LanguageSelector";
 
-const backendURL = "https://new-pro-10.onrender.com"; // your deployed backend
+const backendURL = "https://new-pro-12.onrender.com"; // your deployed backend
 
 export default function App() {
   const [language, setLanguage] = useState("English");
