@@ -1,12 +1,24 @@
-export default function SpeechToText({ setUserText }) {
+export default function SpeechToText({ language, setUserText }) {
   const startListening = () => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
 
+    if (!SpeechRecognition) {
+      alert("Speech recognition not supported");
+      return;
+    }
+
     const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.lang = "ml-IN";
-     recognition.lang = "hi-IN";
+
+    recognition.lang =
+      language === "Malayalam" ? "ml-IN" :
+      language === "Hindi" ? "hi-IN" :
+      language === "Spanish" ? "es-ES" :
+      "en-US";
+
+    recognition.interimResults = false;
+    recognition.continuous = false;
+
     recognition.start();
 
     recognition.onresult = (event) => {
