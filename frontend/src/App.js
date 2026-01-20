@@ -1,87 +1,92 @@
-import { useState } from "react";
-import SpeechToText from "./components/SpeechToText";
-import LanguageSelector from "./components/LanguageSelector";
-import "./App.css"; // your CSS from previous HTML
+import React, { useState } from "react";
+import "./App.css";
 
-const voices = {
-  English: "EXAVITQu4vr4xnSDxMaL",
-  Hindi: "pNInz6obpgDQGcFmaJgB",
-  Spanish: "TxGEqnHWrfWFTfGW9XjX",
-  Malayalam: "EXAVITQu4vr4xnSDxMaL",
-};
+const BACKEND_URL = "https://new-pro-14.onrender.com"; // ✅ your backend
 
 function App() {
+  const [text, setText] = useState("");
   const [language, setLanguage] = useState("English");
-  const [userText, setUserText] = useState("");
   const [reply, setReply] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const backendURL = "https://new-pro-14.onrender.com"; // your deployed backend
+  // -----------------------------
+  // Ask AI (Chat)
+  // -----------------------------
+  const askAI = async () => {
+    if (!text.trim()) {
+      setReply("Please enter some text");
+      return;
+    }
 
-  const sendToAI = async () => {
-    if (!userText) return;
+    setLoading(true);
+    setReply("");
+
     try {
-      const res = await fetch(`${backendURL}/api/chat`, {
+      const res = await fetch(`${BACKEND_URL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userText, language }),
+        body: JSON.stringify({ message: text, language }),
       });
+
       const data = await res.json();
       setReply(data.reply || "AI response not available");
-      speakAI(data.reply || "AI response not available");
+
+      speakText(data.reply);
     } catch (err) {
       console.error(err);
-      setReply("AI response not available");
+      setReply("Error connecting to AI");
+    } finally {
+      setLoading(false);
     }
   };
 
-const speakAI = async (text) => {
-  try {
-    const res = await fetch(`${backendURL}/api/tts`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, language }),
-    });
+  // -----------------------------
+  // Text-to-Speech
+  // -----------------------------
+  const speakText = async (textToSpeak) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: textToSpeak, language }),
+      });
 
-    if (!res.ok) {
-      throw new Error("TTS request failed");
+      if (!res.ok) throw new Error("TTS failed");
+
+      const audioBlob = await res.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      audio.play();
+    } catch (err) {
+      console.error("Audio error:", err);
     }
-
-    const blob = await res.blob();
-
-    if (!blob.type.includes("audio")) {
-      throw new Error("Response is not audio");
-    }
-
-    const audioURL = URL.createObjectURL(blob);
-    const audio = new Audio(audioURL);
-    audio.play();
-
-  } catch (err) {
-    console.error("Audio playback failed:", err);
-  }
-};
-
+  };
 
   return (
     <div className="container">
-      <h2>🤖 AI Voice Assistant</h2>
+      <h1>🤖 AI Voice Assistant</h1>
 
-      <LanguageSelector language={language} setLanguage={setLanguage} />
-
-      <div className="btn-group">
-        <SpeechToText language={language} setUserText={setUserText} />
-        <button onClick={sendToAI}>Ask AI 🔊</button>
-      </div>
+      <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+        <option>English</option>
+        <option>Hindi</option>
+        <option>Spanish</option>
+        <option>Malayalam</option>
+      </select>
 
       <textarea
-        placeholder="Type or speak something..."
-        value={userText}
-        onChange={(e) => setUserText(e.target.value)}
+        placeholder="Type your message..."
+        value={text}
+        onChange={(e) => setText(e.target.value)}
       />
 
-      <p>
-        <b>AI:</b> {reply}
-      </p>
+      <button onClick={askAI} disabled={loading}>
+        {loading ? "Thinking..." : "Ask AI 🔊"}
+      </button>
+
+      <div className="reply">
+        <strong>AI:</strong>
+        <p>{reply}</p>
+      </div>
     </div>
   );
 }
