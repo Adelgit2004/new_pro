@@ -1,66 +1,69 @@
 import { useState } from "react";
-import LanguageSelector from "./components/LanguageSelector";
 import SpeechToText from "./components/SpeechToText";
+import LanguageSelector from "./components/LanguageSelector";
 
-const voices = {
-  English: "EXAVITQu4vr4xnSDxMaL",
-  Hindi: "pNInz6obpgDQGcFmaJgB",
-  Spanish: "TxGEqnHWrfWFTfGW9XjX",
-  Malayalam: "EXAVITQu4vr4xnSDxMaL"
-};
+const backendURL = "https://YOUR-BACKEND.onrender.com";
 
-function App() {
-  const [text, setText] = useState("");
-  const [reply, setReply] = useState("");
+export default function App() {
   const [language, setLanguage] = useState("English");
-
-  // Replace with your deployed backend URL after Render deployment
-  const backendURL = "https://your-backend-service.onrender.com";
+  const [userText, setUserText] = useState("");
+  const [reply, setReply] = useState("");
 
   const sendToAI = async () => {
-    const res = await fetch(`${backendURL}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, language }),
-    });
-    const data = await res.json();
-    setReply(data.reply);
-    speakAI(data.reply);
+    if (!userText) return;
+
+    try {
+      const res = await fetch(`${backendURL}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userText, language })
+      });
+
+      const data = await res.json();
+      setReply(data.reply || "response not available");
+
+      speak(data.reply);
+
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const speakAI = async (aiText) => {
+  const speak = async (text) => {
     const res = await fetch(`${backendURL}/api/tts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: aiText, voiceId: voices[language] }),
+      body: JSON.stringify({ text, language })
     });
-    const blob = await res.blob();
-    const audio = new Audio(URL.createObjectURL(blob));
+
+    const audioBlob = await res.blob();
+    const audio = new Audio(URL.createObjectURL(audioBlob));
     audio.play();
   };
 
   return (
-    <div style={{ padding: 20, maxWidth: 500 }}>
+    <div style={{ padding: 20 }}>
       <h2>🤖 AI Voice Assistant</h2>
 
+      {/* 🌍 Language */}
       <LanguageSelector language={language} setLanguage={setLanguage} />
-      <SpeechToText setUserText={setText} />
 
+      {/* 🎤 Speech to Text */}
+      <SpeechToText language={language} setUserText={setUserText} />
+
+      {/* 📝 User text */}
       <textarea
-        rows="4"
-        placeholder="Ask something..."
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        style={{ width: "100%", marginTop: 10 }}
+        rows="3"
+        value={userText}
+        onChange={(e) => setUserText(e.target.value)}
+        placeholder="Speak or type..."
       />
 
-      <button onClick={sendToAI} style={{ marginTop: 10 }}>
-        Ask AI 🔊
-      </button>
+      {/* 🤖 Ask AI */}
+      <button onClick={sendToAI}>Ask AI 🔊</button>
 
+      {/* 💬 AI Reply */}
       <p><b>AI:</b> {reply}</p>
     </div>
   );
 }
-
-export default App;
