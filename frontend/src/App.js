@@ -2,7 +2,7 @@ import { useState } from "react";
 import SpeechToText from "./components/SpeechToText";
 import LanguageSelector from "./components/LanguageSelector";
 
-const backendURL = "https://new-pro-5.onrender.com";
+const backendURL = "https://new-pro-10.onrender.com"; // your deployed backend
 
 export default function App() {
   const [language, setLanguage] = useState("English");
@@ -16,54 +16,59 @@ export default function App() {
       const res = await fetch(`${backendURL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userText, language })
+        body: JSON.stringify({ message: userText, language }),
       });
 
       const data = await res.json();
       setReply(data.reply || "response not available");
 
       speak(data.reply);
-
     } catch (err) {
       console.error(err);
+      setReply("response not available");
     }
   };
 
   const speak = async (text) => {
-    const res = await fetch(`${backendURL}/api/tts`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, language })
-    });
+    if (!text) return;
 
-    const audioBlob = await res.blob();
-    const audio = new Audio(URL.createObjectURL(audioBlob));
-    audio.play();
+    try {
+      const res = await fetch(`${backendURL}/api/tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, language }),
+      });
+
+      const audioBlob = await res.blob();
+      const audio = new Audio(URL.createObjectURL(audioBlob));
+      audio.play();
+    } catch (err) {
+      console.error("TTS error:", err);
+    }
   };
 
   return (
-    <div style={{ padding: 20 }}>
+    <div style={{ padding: 20, maxWidth: 500 }}>
       <h2>🤖 AI Voice Assistant</h2>
 
-      {/* 🌍 Language */}
       <LanguageSelector language={language} setLanguage={setLanguage} />
-
-      {/* 🎤 Speech to Text */}
       <SpeechToText language={language} setUserText={setUserText} />
 
-      {/* 📝 User text */}
       <textarea
         rows="3"
+        placeholder="Type or speak something..."
         value={userText}
         onChange={(e) => setUserText(e.target.value)}
-        placeholder="Speak or type..."
+        style={{ width: "100%", marginTop: 10 }}
       />
 
-      {/* 🤖 Ask AI */}
-      <button onClick={sendToAI}>Ask AI 🔊</button>
+      <button onClick={sendToAI} style={{ marginTop: 10 }}>
+        Ask AI 🔊
+      </button>
 
-      {/* 💬 AI Reply */}
-      <p><b>AI:</b> {reply}</p>
+      <p style={{ marginTop: 20 }}>
+        <b>AI:</b> {reply}
+      </p>
     </div>
   );
 }
