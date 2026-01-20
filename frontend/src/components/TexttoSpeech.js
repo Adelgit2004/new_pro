@@ -10,7 +10,10 @@ export default function TextToSpeech() {
     utterance.lang = "en-US";
     utterance.rate = 1;
     utterance.pitch = 1;
-
+    const voices = { English: "EXAVITQu4vr4xnSDxMaL", Hindi: "pNInz6obpgDQGcFmaJgB", Spanish: "TxGEqnHWrfWFTfGW9XjX", Malayalam: "EXAVITQu4vr4xnSDxMaL" };
+   content: language === "Malayalam"
+  ? "Translate Malayalam to English and reply naturally"
+  : `Reply naturally in ${language}`
     // Optional: choose best available voice
     const voices = window.speechSynthesis.getVoices();
     const naturalVoice = voices.find(v => v.lang === "en-US");
