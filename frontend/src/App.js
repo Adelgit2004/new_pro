@@ -15,7 +15,7 @@ function App() {
   const [userText, setUserText] = useState("");
   const [reply, setReply] = useState("");
 
-  const backendURL = "https://new-pro-12.onrender.com"; // your deployed backend
+  const backendURL = "https://new-pro-14.onrender.com"; // your deployed backend
 
   const sendToAI = async () => {
     if (!userText) return;
