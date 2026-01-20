@@ -1,38 +1,64 @@
 import { useState } from "react";
-import SpeechToText from "./components/SpeechToText";
-import AIChat from "./components/AIChat";
-import TextToSpeech from "./components/TextToSpeech";
 import LanguageSelector from "./components/LanguageSelector";
+import SpeechToText from "./components/SpeechToText";
+
+const voices = {
+  English: "EXAVITQu4vr4xnSDxMaL",
+  Hindi: "pNInz6obpgDQGcFmaJgB",
+  Spanish: "TxGEqnHWrfWFTfGW9XjX",
+  Malayalam: "EXAVITQu4vr4xnSDxMaL"
+};
 
 function App() {
-  const [userText, setUserText] = useState("");
-  const [aiReply, setAiReply] = useState("");
+  const [text, setText] = useState("");
+  const [reply, setReply] = useState("");
   const [language, setLanguage] = useState("English");
+
+  // Replace with your deployed backend URL after Render deployment
+  const backendURL = "https://your-backend-service.onrender.com";
+
+  const sendToAI = async () => {
+    const res = await fetch(`${backendURL}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, language }),
+    });
+    const data = await res.json();
+    setReply(data.reply);
+    speakAI(data.reply);
+  };
+
+  const speakAI = async (aiText) => {
+    const res = await fetch(`${backendURL}/api/tts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: aiText, voiceId: voices[language] }),
+    });
+    const blob = await res.blob();
+    const audio = new Audio(URL.createObjectURL(blob));
+    audio.play();
+  };
 
   return (
     <div style={{ padding: 20, maxWidth: 500 }}>
       <h2>🤖 AI Voice Assistant</h2>
 
-      <LanguageSelector
-        language={language}
-        setLanguage={setLanguage}
+      <LanguageSelector language={language} setLanguage={setLanguage} />
+      <SpeechToText setUserText={setText} />
+
+      <textarea
+        rows="4"
+        placeholder="Ask something..."
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        style={{ width: "100%", marginTop: 10 }}
       />
 
-      <SpeechToText setUserText={setUserText} />
+      <button onClick={sendToAI} style={{ marginTop: 10 }}>
+        Ask AI 🔊
+      </button>
 
-      <AIChat
-        userText={userText}
-        language={language}
-        setAiReply={setAiReply}
-      />
-
-      <TextToSpeech
-        text={aiReply}
-        language={language}
-      />
-
-      <p><b>You:</b> {userText}</p>
-      <p><b>AI:</b> {aiReply}</p>
+      <p><b>AI:</b> {reply}</p>
     </div>
   );
 }
