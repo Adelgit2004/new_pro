@@ -34,20 +34,33 @@ function App() {
     }
   };
 
-  const speakAI = async (text) => {
-    try {
-      const res = await fetch(`${backendURL}/api/tts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, language }),
-      });
-      const blob = await res.blob();
-      const audio = new Audio(URL.createObjectURL(blob));
-      audio.play();
-    } catch (err) {
-      console.error("TTS Error:", err);
+const speakAI = async (text) => {
+  try {
+    const res = await fetch(`${backendURL}/api/tts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, language }),
+    });
+
+    if (!res.ok) {
+      throw new Error("TTS request failed");
     }
-  };
+
+    const blob = await res.blob();
+
+    if (!blob.type.includes("audio")) {
+      throw new Error("Response is not audio");
+    }
+
+    const audioURL = URL.createObjectURL(blob);
+    const audio = new Audio(audioURL);
+    audio.play();
+
+  } catch (err) {
+    console.error("Audio playback failed:", err);
+  }
+};
+
 
   return (
     <div className="container">
