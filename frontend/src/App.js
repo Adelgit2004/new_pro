@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import "./App.css";
 
 const BACKEND_URL = "https://new-pro-14.onrender.com"; // ✅ your backend
 
