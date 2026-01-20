@@ -2,7 +2,7 @@ import { useState } from "react";
 import SpeechToText from "./components/SpeechToText";
 import LanguageSelector from "./components/LanguageSelector";
 
-const backendURL = "https://YOUR-BACKEND.onrender.com";
+const backendURL = "https://new-pro-5.onrender.com";
 
 export default function App() {
   const [language, setLanguage] = useState("English");
