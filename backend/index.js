@@ -12,6 +12,9 @@ let ttsEnabled = true; // Auto-disable if ElevenLabs fails
 // -------------------------
 // AI Chat Endpoint
 // -------------------------
+app.get("/", (req, res) => {
+  res.send("Backend is running! Use /api/chat and /api/tts");
+});
 app.post("/api/chat", async (req, res) => {
   const { message, language } = req.body;
 
