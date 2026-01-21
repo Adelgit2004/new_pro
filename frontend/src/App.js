@@ -1,93 +1,91 @@
-import React, { useState } from "react";
+import { useState } from "react";
 
-const BACKEND_URL = "https://new-pro-20.onrender.com"; // ✅ your backend
+const voices = {
+  English: "EXAVITQu4vr4xnSDxMaL",
+  Hindi: "pNInz6obpgDQGcFmaJgB",
+  Spanish: "TxGEqnHWrfWFTfGW9XjX",
+  Malayalam: "EXAVITQu4vr4xnSDxMaL",
+};
 
-function App() {
+export default function App() {
   const [text, setText] = useState("");
-  const [language, setLanguage] = useState("English");
   const [reply, setReply] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [language, setLanguage] = useState("English");
 
-  // -----------------------------
-  // Ask AI (Chat)
-  // -----------------------------
-  const askAI = async () => {
-    if (!text.trim()) {
-      setReply("Please enter some text");
-      return;
-    }
+  const backendURL = "https://your-backend-url.onrender.com"; // Replace with deployed backend
 
-    setLoading(true);
-    setReply("");
-
+  const sendToAI = async () => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/chat`, {
+      const res = await fetch(`${backendURL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text, language }),
       });
-
       const data = await res.json();
-      setReply(data.reply || "AI response not available");
-
-      speakText(data.reply);
+      setReply(data.reply);
+      speakAI(data.reply);
     } catch (err) {
-      console.error(err);
-      setReply("Error connecting to AI");
-    } finally {
-      setLoading(false);
+      console.error("Chat Error:", err);
+      setReply("AI service failed");
     }
   };
 
-  // -----------------------------
-  // Text-to-Speech
-  // -----------------------------
-  const speakText = async (textToSpeak) => {
+  const speakAI = async (aiText) => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/tts`, {
+      const res = await fetch(`${backendURL}/api/tts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: textToSpeak, language }),
+        body: JSON.stringify({ text: aiText, language }),
       });
 
-      if (!res.ok) throw new Error("TTS failed");
+      if (!res.ok) {
+        // Fallback to browser TTS
+        const reader = new SpeechSynthesisUtterance(aiText);
+        reader.lang = language === "Malayalam" ? "ml-IN" :
+                      language === "Hindi" ? "hi-IN" :
+                      language === "Spanish" ? "es-ES" : "en-US";
+        window.speechSynthesis.speak(reader);
+        return;
+      }
 
-      const audioBlob = await res.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
+      const blob = await res.blob();
+      const audio = new Audio(URL.createObjectURL(blob));
       audio.play();
     } catch (err) {
-      console.error("Audio error:", err);
+      console.error("TTS Error:", err);
+      // fallback to browser TTS
+      const reader = new SpeechSynthesisUtterance(aiText);
+      reader.lang = language === "Malayalam" ? "ml-IN" :
+                    language === "Hindi" ? "hi-IN" :
+                    language === "Spanish" ? "es-ES" : "en-US";
+      window.speechSynthesis.speak(reader);
     }
   };
 
   return (
-    <div className="container">
-      <h1>🤖 AI Voice Assistant</h1>
+    <div style={{ padding: 20, maxWidth: 500 }}>
+      <h2>🤖 AI Voice Assistant</h2>
 
-      <select value={language} onChange={(e) => setLanguage(e.target.value)}>
-        <option>English</option>
-        <option>Hindi</option>
-        <option>Spanish</option>
-        <option>Malayalam</option>
+      <select onChange={(e) => setLanguage(e.target.value)} value={language}>
+        {Object.keys(voices).map((lang) => (
+          <option key={lang}>{lang}</option>
+        ))}
       </select>
 
       <textarea
-        placeholder="Type your message..."
+        rows="4"
+        placeholder="Ask something..."
         value={text}
         onChange={(e) => setText(e.target.value)}
+        style={{ width: "100%", marginTop: 10 }}
       />
 
-      <button onClick={askAI} disabled={loading}>
-        {loading ? "Thinking..." : "Ask AI 🔊"}
+      <button onClick={sendToAI} style={{ marginTop: 10 }}>
+        Ask AI 🔊
       </button>
 
-      <div className="reply">
-        <strong>AI:</strong>
-        <p>{reply}</p>
-      </div>
+      <p><b>AI:</b> {reply}</p>
     </div>
   );
 }
 
-export default App;
