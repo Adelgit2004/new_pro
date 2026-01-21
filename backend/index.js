@@ -1,17 +1,15 @@
+
 import express from "express";
 import cors from "cors";
-import fetch from "node-fetch"; // optional if Node 18+
+import fetch from "node-fetch"; // Node 18+ has global fetch, safe to import
 import 'dotenv/config';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Flag to check if TTS is enabled
-let ttsEnabled = true;
-
 // -------------------------
-// Root route - test backend
+// Test endpoint to verify backend
 // -------------------------
 app.get("/", (req, res) => {
   res.send("Backend is running! Use /api/chat and /api/tts");
@@ -26,7 +24,6 @@ app.post("/api/chat", async (req, res) => {
   if (!message) return res.json({ reply: "Please enter a message" });
 
   try {
-    // Build prompt
     const prompt =
       language === "Malayalam"
         ? `Translate Malayalam to English and reply naturally: ${message}`
@@ -47,32 +44,41 @@ app.post("/api/chat", async (req, res) => {
 
     const data = await openaiRes.json();
 
-    const reply = data.choices?.[0]?.message?.content || "AI response not available";
+    let reply = "AI response not available";
+
+    if (data.error) {
+      console.error("OpenAI error:", data.error);
+      reply = "AI service temporarily unavailable";
+    } else {
+      reply = data.choices?.[0]?.message?.content || reply;
+    }
 
     res.json({ reply });
   } catch (err) {
-    console.error("Chat Error:", err);
-    res.status(500).json({ reply: "AI response not available" });
+    console.error("Chat API failed:", err);
+    res.json({ reply: "AI service temporarily unavailable" });
   }
 });
 
 // -------------------------
-// Text-to-Speech Endpoint
+// TTS Endpoint with fallback
 // -------------------------
+let ttsEnabled = true; // auto-disable if API fails
+
 app.post("/api/tts", async (req, res) => {
   const { text, language } = req.body;
 
   if (!text) return res.status(400).send("No text provided for TTS");
 
   if (!ttsEnabled) {
-    return res.status(503).json({ error: "TTS disabled due to quota/API failure" });
+    return res.status(503).json({ error: "TTS quota exceeded, use browser TTS" });
   }
 
   const voices = {
     English: "EXAVITQu4vr4xnSDxMaL",
     Hindi: "pNInz6obpgDQGcFmaJgB",
     Spanish: "TxGEqnHWrfWFTfGW9XjX",
-    Malayalam: "EXAVITQu4vr4xnSDxMaL", // fallback
+    Malayalam: "EXAVITQu4vr4xnSDxMaL",
   };
 
   const voiceId = voices[language] || voices.English;
@@ -90,21 +96,20 @@ app.post("/api/tts", async (req, res) => {
       }),
     });
 
-    // If API key invalid or quota exceeded
     if (!ttsRes.ok) {
-      ttsEnabled = false; // disable TTS
-      const errorData = await ttsRes.json();
-      console.error("ElevenLabs error:", errorData);
-      return res.status(503).json({ error: "TTS quota exceeded or API failed" });
+      // disable TTS if quota exceeded or unusual activity
+      console.error("ElevenLabs TTS failed:", await ttsRes.text());
+      ttsEnabled = false;
+      return res.status(503).json({ error: "TTS quota exceeded, use browser TTS" });
     }
 
     const audioBuffer = await ttsRes.arrayBuffer();
     res.set("Content-Type", "audio/mpeg");
     res.send(Buffer.from(audioBuffer));
   } catch (err) {
-    console.error("TTS Error:", err);
-    ttsEnabled = false; // disable TTS
-    res.status(503).json({ error: "TTS failed, browser TTS can be used as fallback" });
+    console.error("TTS request failed:", err);
+    ttsEnabled = false;
+    res.status(503).json({ error: "TTS service temporarily unavailable, use browser TTS" });
   }
 });
 
