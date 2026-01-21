@@ -1,28 +1,27 @@
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
-import dotenv from "dotenv";
-
-dotenv.config();
+import "dotenv/config";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-/* ---------------- HEALTH CHECK ---------------- */
-app.get("/", (req, res) => {
-  res.json({ status: "Backend running" });
-});
+let ttsEnabled = true; // Auto-disable if ElevenLabs fails
 
-/* ---------------- AI CHAT ---------------- */
+// -------------------------
+// AI Chat Endpoint
+// -------------------------
 app.post("/api/chat", async (req, res) => {
+  const { message, language } = req.body;
+
+  if (!message) return res.json({ reply: "Please enter a message" });
+
+  if (!process.env.OPENAI_API_KEY) {
+    return res.json({ reply: "OpenAI API key not set. Chat unavailable." });
+  }
+
   try {
-    const { message, language } = req.body;
-
-    if (!message) {
-      return res.json({ reply: "Please enter a message." });
-    }
-
     const prompt =
       language === "Malayalam"
         ? `Translate Malayalam to English and reply naturally: ${message}`
@@ -35,7 +34,7 @@ app.post("/api/chat", async (req, res) => {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-3.5-turbo",
         messages: [{ role: "user", content: prompt }],
         max_tokens: 200,
       }),
@@ -43,66 +42,70 @@ app.post("/api/chat", async (req, res) => {
 
     const data = await response.json();
 
-    if (!data.choices) {
-      console.error("OpenAI error:", data);
-      return res.status(500).json({ reply: "AI service failed" });
-    }
-
-    res.json({ reply: data.choices[0].message.content });
+    const reply = data.choices?.[0]?.message?.content || "AI response not available";
+    res.json({ reply });
   } catch (err) {
-    console.error("Chat error:", err);
+    console.error("OpenAI Chat Error:", err);
     res.status(500).json({ reply: "AI service failed" });
   }
 });
 
-/* ---------------- TEXT TO SPEECH ---------------- */
+// -------------------------
+// TTS Endpoint
+// -------------------------
 app.post("/api/tts", async (req, res) => {
+  const { text, language } = req.body;
+
+  if (!text) return res.status(400).send("No text provided");
+
+  if (!ttsEnabled) return res.status(403).json({ error: "Quota exceeded, TTS disabled" });
+
+  const voices = {
+    English: "EXAVITQu4vr4xnSDxMaL",
+    Hindi: "pNInz6obpgDQGcFmaJgB",
+    Spanish: "TxGEqnHWrfWFTfGW9XjX",
+    Malayalam: "EXAVITQu4vr4xnSDxMaL", // fallback
+  };
+
+  const voiceId = voices[language] || voices.English;
+
   try {
-    const { text, language } = req.body;
-
-    if (!text) {
-      return res.status(400).send("No text provided");
+    if (!process.env.ELEVENLABS_API_KEY) {
+      ttsEnabled = false;
+      return res.status(403).json({ error: "ElevenLabs API key missing" });
     }
 
-    const voices = {
-      English: "EXAVITQu4vr4xnSDxMaL",
-      Hindi: "pNInz6obpgDQGcFmaJgB",
-      Spanish: "TxGEqnHWrfWFTfGW9XjX",
-      Malayalam: "EXAVITQu4vr4xnSDxMaL",
-    };
+    const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: "POST",
+      headers: {
+        "xi-api-key": process.env.ELEVENLABS_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        text,
+        model_id: "eleven_multilingual_v2",
+      }),
+    });
 
-    const voiceId = voices[language] || voices.English;
-
-    const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
-      {
-        method: "POST",
-        headers: {
-          "xi-api-key": process.env.ELEVENLABS_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text,
-          model_id: "eleven_multilingual_v2",
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("ElevenLabs error:", errText);
-      return res.status(500).send("TTS failed");
+    if (!ttsRes.ok) {
+      console.error("ElevenLabs TTS Error:", await ttsRes.text());
+      ttsEnabled = false;
+      return res.status(403).json({ error: "Quota exceeded, TTS disabled" });
     }
 
-    const audio = Buffer.from(await response.arrayBuffer());
+    const audioBuffer = await ttsRes.arrayBuffer();
     res.set("Content-Type", "audio/mpeg");
-    res.send(audio);
+    res.send(Buffer.from(audioBuffer));
   } catch (err) {
-    console.error("TTS crash:", err);
-    res.status(500).send("TTS failed");
+    console.error("TTS Error:", err);
+    ttsEnabled = false;
+    res.status(500).json({ error: "TTS failed" });
   }
 });
 
-/* ---------------- START SERVER ---------------- */
+// -------------------------
+// Start Server
+// -------------------------
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Backend running on ${PORT}`));
+app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+
