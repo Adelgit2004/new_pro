@@ -12,20 +12,17 @@ export default function App() {
   const [reply, setReply] = useState("");
   const [language, setLanguage] = useState("English");
 
-  const backendURL = "https://new-pro-34.onrender.com";
+  const backendURL = "https://new-pro-32.onrender.com"; // Replace with your deployed backend
 
   const sendToAI = async () => {
-    if (!text.trim()) return;
-
     try {
       const res = await fetch(`${backendURL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text, language }),
       });
-
       const data = await res.json();
-      setReply(data.reply || "No reply");
+      setReply(data.reply);
       speakAI(data.reply);
     } catch (err) {
       console.error("Chat Error:", err);
@@ -35,9 +32,6 @@ export default function App() {
 
   const speakAI = async (aiText) => {
     try {
-      // Stop any ongoing speech
-      window.speechSynthesis.cancel();
-
       const res = await fetch(`${backendURL}/api/tts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -47,33 +41,32 @@ export default function App() {
       const contentType = res.headers.get("content-type");
 
       if (contentType && contentType.includes("audio")) {
-        // 🔊 ElevenLabs audio
         const blob = await res.blob();
-        const audioUrl = URL.createObjectURL(blob);
-        const audio = new Audio(audioUrl);
-
-        audio.onended = () => URL.revokeObjectURL(audioUrl);
+        const audio = new Audio(URL.createObjectURL(blob));
         audio.play();
       } else {
-        // 🗣️ Browser TTS fallback
         const reader = new SpeechSynthesisUtterance(aiText);
         reader.lang =
-          language === "Malayalam" ? "ml-IN" :
-          language === "Hindi" ? "hi-IN" :
-          language === "Spanish" ? "es-ES" : "en-US";
-
+          language === "Malayalam"
+            ? "ml-IN"
+            : language === "Hindi"
+            ? "hi-IN"
+            : language === "Spanish"
+            ? "es-ES"
+            : "en-US";
         window.speechSynthesis.speak(reader);
       }
     } catch (err) {
       console.error("TTS Error:", err);
-
-      // 🗣️ Emergency fallback
       const reader = new SpeechSynthesisUtterance(aiText);
       reader.lang =
-        language === "Malayalam" ? "ml-IN" :
-        language === "Hindi" ? "hi-IN" :
-        language === "Spanish" ? "es-ES" : "en-US";
-
+        language === "Malayalam"
+          ? "ml-IN"
+          : language === "Hindi"
+          ? "hi-IN"
+          : language === "Spanish"
+          ? "es-ES"
+          : "en-US";
       window.speechSynthesis.speak(reader);
     }
   };
@@ -82,9 +75,12 @@ export default function App() {
     <div style={{ padding: 20, maxWidth: 500 }}>
       <h2>🤖 AI Voice Assistant</h2>
 
-      <select onChange={(e) => setLanguage(e.target.value)} value={language}>
+      <select
+        onChange={(e) => setLanguage(e.target.value)}
+        value={language}
+      >
         {Object.keys(voices).map((lang) => (
-          <option key={lang} value={lang}>{lang}</option>
+          <option key={lang}>{lang}</option>
         ))}
       </select>
 
@@ -100,7 +96,12 @@ export default function App() {
         Ask AI 🔊
       </button>
 
-      <p><b>AI:</b> {reply}</p>
+      <p>
+        <b>AI:</b> {reply}
+      </p>
     </div>
   );
 }
+
+
+  
