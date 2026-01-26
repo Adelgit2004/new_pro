@@ -1,59 +1,76 @@
-
 import express from "express";
 import cors from "cors";
-import fetch from "node-fetch"; // Node 18+ has global fetch, safe to import
-import 'dotenv/config';
+import fetch from "node-fetch";
+import "dotenv/config";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 // -------------------------
-// Test endpoint to verify backend
+// TTS auto-retry logic
+// -------------------------
+let ttsEnabled = true;
+
+const disableTTSWithRetry = () => {
+  if (!ttsEnabled) return;
+
+  ttsEnabled = false;
+  console.log("TTS disabled. Retrying in 5 minutes...");
+
+  setTimeout(() => {
+    ttsEnabled = true;
+    console.log("TTS re-enabled.");
+  }, 5 * 60 * 1000);
+};
+
+// -------------------------
+// Test endpoint
 // -------------------------
 app.get("/", (req, res) => {
   res.send("Backend is running! Use /api/chat and /api/tts");
 });
 
 // -------------------------
-// AI Chat Endpoint
+// AI Chat (OpenAI Responses API)
 // -------------------------
 app.post("/api/chat", async (req, res) => {
   const { message, language } = req.body;
 
-  if (!message) return res.json({ reply: "Please enter a message" });
+  if (!message) {
+    return res.json({ reply: "Please enter a message" });
+  }
+
+  const prompt =
+    language === "Malayalam"
+      ? `Translate Malayalam to English and reply naturally: ${message}`
+      : `Reply naturally in ${language}: ${message}`;
 
   try {
-    const prompt =
-      language === "Malayalam"
-        ? `Translate Malayalam to English and reply naturally: ${message}`
-        : `Reply naturally in ${language}: ${message}`;
-
-    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 200,
-      }),
-    });
+    const openaiRes = await fetch(
+      "https://api.openai.com/v1/responses",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4.1-mini",
+          input: prompt,
+        }),
+      }
+    );
 
     const data = await openaiRes.json();
 
-    let reply = "AI response not available";
-
-    if (data.error) {
-      console.error("OpenAI error:", data.error);
-      reply = "AI service temporarily unavailable";
-    } else {
-      reply = data.choices?.[0]?.message?.content || reply;
-    }
+    let reply =
+      data.output_text ||
+      data.output?.[0]?.content?.[0]?.text ||
+      "AI response not available";
 
     res.json({ reply });
+
   } catch (err) {
     console.error("Chat API failed:", err);
     res.json({ reply: "AI service temporarily unavailable" });
@@ -61,21 +78,22 @@ app.post("/api/chat", async (req, res) => {
 });
 
 // -------------------------
-// TTS Endpoint with fallback
+// TTS Endpoint (Streaming + Fallback)
+// -------------------------
 app.post("/api/tts", async (req, res) => {
   const { text, language } = req.body;
 
   if (!text) {
     return res.json({
       fallback: true,
-      message: "No text provided for TTS"
+      message: "No text provided for TTS",
     });
   }
 
   if (!ttsEnabled) {
     return res.json({
       fallback: true,
-      message: "TTS quota exceeded. Use browser TTS."
+      message: "TTS quota exceeded. Use browser TTS.",
     });
   }
 
@@ -106,25 +124,25 @@ app.post("/api/tts", async (req, res) => {
 
     if (!ttsRes.ok) {
       console.error("ElevenLabs TTS failed:", await ttsRes.text());
-      ttsEnabled = false;
+      disableTTSWithRetry();
 
       return res.json({
         fallback: true,
-        message: "TTS temporarily unavailable. Use browser TTS."
+        message: "TTS temporarily unavailable. Use browser TTS.",
       });
     }
 
-    const audioBuffer = await ttsRes.arrayBuffer();
+    // 🔊 STREAM AUDIO
     res.set("Content-Type", "audio/mpeg");
-    res.send(Buffer.from(audioBuffer));
+    ttsRes.body.pipe(res);
 
   } catch (err) {
     console.error("TTS request failed:", err);
-    ttsEnabled = false;
+    disableTTSWithRetry();
 
     res.json({
       fallback: true,
-      message: "TTS service unavailable. Use browser TTS."
+      message: "TTS service unavailable. Use browser TTS.",
     });
   }
 });
@@ -133,4 +151,6 @@ app.post("/api/tts", async (req, res) => {
 // Start Server
 // -------------------------
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+app.listen(PORT, () =>
+  console.log(`Backend running on port ${PORT}`)
+);
