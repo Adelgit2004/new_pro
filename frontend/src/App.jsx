@@ -12,7 +12,7 @@ export default function App() {
   const [reply, setReply] = useState("");
   const [language, setLanguage] = useState("English");
 
-  const backendURL = "https://new-pro-32.onrender.com";
+  const backendURL = "https://new-pro-34.onrender.com";
 
   const sendToAI = async () => {
     if (!text.trim()) return;
