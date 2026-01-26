@@ -62,16 +62,21 @@ app.post("/api/chat", async (req, res) => {
 
 // -------------------------
 // TTS Endpoint with fallback
-// -------------------------
-let ttsEnabled = true; // auto-disable if API fails
-
 app.post("/api/tts", async (req, res) => {
   const { text, language } = req.body;
 
-  if (!text) return res.status(400).send("No text provided for TTS");
+  if (!text) {
+    return res.json({
+      fallback: true,
+      message: "No text provided for TTS"
+    });
+  }
 
   if (!ttsEnabled) {
-    return res.status(503).json({ error: "TTS quota exceeded, use browser TTS" });
+    return res.json({
+      fallback: true,
+      message: "TTS quota exceeded. Use browser TTS."
+    });
   }
 
   const voices = {
@@ -84,32 +89,43 @@ app.post("/api/tts", async (req, res) => {
   const voiceId = voices[language] || voices.English;
 
   try {
-    const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-      method: "POST",
-      headers: {
-        "xi-api-key": process.env.ELEVENLABS_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        text,
-        model_id: "eleven_multilingual_v2",
-      }),
-    });
+    const ttsRes = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+      {
+        method: "POST",
+        headers: {
+          "xi-api-key": process.env.ELEVENLABS_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text,
+          model_id: "eleven_multilingual_v2",
+        }),
+      }
+    );
 
     if (!ttsRes.ok) {
-      // disable TTS if quota exceeded or unusual activity
       console.error("ElevenLabs TTS failed:", await ttsRes.text());
       ttsEnabled = false;
-      return res.status(503).json({ error: "TTS quota exceeded, use browser TTS" });
+
+      return res.json({
+        fallback: true,
+        message: "TTS temporarily unavailable. Use browser TTS."
+      });
     }
 
     const audioBuffer = await ttsRes.arrayBuffer();
     res.set("Content-Type", "audio/mpeg");
     res.send(Buffer.from(audioBuffer));
+
   } catch (err) {
     console.error("TTS request failed:", err);
     ttsEnabled = false;
-    res.status(503).json({ error: "TTS service temporarily unavailable, use browser TTS" });
+
+    res.json({
+      fallback: true,
+      message: "TTS service unavailable. Use browser TTS."
+    });
   }
 });
 
