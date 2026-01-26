@@ -12,17 +12,20 @@ export default function App() {
   const [reply, setReply] = useState("");
   const [language, setLanguage] = useState("English");
 
-  const backendURL = "https://new-pro-32.onrender.com" // Replace with deployed backend
+  const backendURL = "https://new-pro-32.onrender.com";
 
   const sendToAI = async () => {
+    if (!text.trim()) return;
+
     try {
       const res = await fetch(`${backendURL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text, language }),
       });
+
       const data = await res.json();
-      setReply(data.reply);
+      setReply(data.reply || "No reply");
       speakAI(data.reply);
     } catch (err) {
       console.error("Chat Error:", err);
@@ -30,23 +33,41 @@ export default function App() {
     }
   };
 
- const speakAI = async (aiText) => {
-  try {
-    const res = await fetch(`${backendURL}/api/tts`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: aiText, language }),
-    });
+  const speakAI = async (aiText) => {
+    try {
+      // Stop any ongoing speech
+      window.speechSynthesis.cancel();
 
-    const contentType = res.headers.get("content-type");
+      const res = await fetch(`${backendURL}/api/tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: aiText, language }),
+      });
 
-    if (contentType && contentType.includes("audio")) {
-      // 🔊 ElevenLabs audio
-      const blob = await res.blob();
-      const audio = new Audio(URL.createObjectURL(blob));
-      audio.play();
-    } else {
-      // 🗣️ Browser TTS fallback
+      const contentType = res.headers.get("content-type");
+
+      if (contentType && contentType.includes("audio")) {
+        // 🔊 ElevenLabs audio
+        const blob = await res.blob();
+        const audioUrl = URL.createObjectURL(blob);
+        const audio = new Audio(audioUrl);
+
+        audio.onended = () => URL.revokeObjectURL(audioUrl);
+        audio.play();
+      } else {
+        // 🗣️ Browser TTS fallback
+        const reader = new SpeechSynthesisUtterance(aiText);
+        reader.lang =
+          language === "Malayalam" ? "ml-IN" :
+          language === "Hindi" ? "hi-IN" :
+          language === "Spanish" ? "es-ES" : "en-US";
+
+        window.speechSynthesis.speak(reader);
+      }
+    } catch (err) {
+      console.error("TTS Error:", err);
+
+      // 🗣️ Emergency fallback
       const reader = new SpeechSynthesisUtterance(aiText);
       reader.lang =
         language === "Malayalam" ? "ml-IN" :
@@ -55,20 +76,7 @@ export default function App() {
 
       window.speechSynthesis.speak(reader);
     }
-  } catch (err) {
-    console.error("TTS Error:", err);
-
-    // 🗣️ Emergency fallback
-    const reader = new SpeechSynthesisUtterance(aiText);
-    reader.lang =
-      language === "Malayalam" ? "ml-IN" :
-      language === "Hindi" ? "hi-IN" :
-      language === "Spanish" ? "es-ES" : "en-US";
-
-    window.speechSynthesis.speak(reader);
-  }
-};
-
+  };
 
   return (
     <div style={{ padding: 20, maxWidth: 500 }}>
@@ -76,7 +84,7 @@ export default function App() {
 
       <select onChange={(e) => setLanguage(e.target.value)} value={language}>
         {Object.keys(voices).map((lang) => (
-          <option key={lang}>{lang}</option>
+          <option key={lang} value={lang}>{lang}</option>
         ))}
       </select>
 
@@ -96,4 +104,3 @@ export default function App() {
     </div>
   );
 }
-
