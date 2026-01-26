@@ -1,28 +1,11 @@
 import express from "express";
 import cors from "cors";
-import fetch from "node-fetch";
-import "dotenv/config";
+import fetch from "node-fetch"; // Node 18+ has global fetch
+import 'dotenv/config';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-// -------------------------
-// TTS auto-retry logic
-// -------------------------
-let ttsEnabled = true;
-
-const disableTTSWithRetry = () => {
-  if (!ttsEnabled) return;
-
-  ttsEnabled = false;
-  console.log("TTS disabled. Retrying in 5 minutes...");
-
-  setTimeout(() => {
-    ttsEnabled = true;
-    console.log("TTS re-enabled.");
-  }, 5 * 60 * 1000);
-};
 
 // -------------------------
 // Test endpoint
@@ -32,7 +15,7 @@ app.get("/", (req, res) => {
 });
 
 // -------------------------
-// AI Chat (OpenAI Responses API)
+// AI Chat Endpoint (OpenAI Responses API)
 // -------------------------
 app.post("/api/chat", async (req, res) => {
   const { message, language } = req.body;
@@ -60,7 +43,6 @@ app.post("/api/chat", async (req, res) => {
     });
 
     const data = await openaiRes.json();
-
     let reply = "AI response not available";
 
     if (data.error) {
@@ -77,38 +59,25 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
-    const data = await openaiRes.json();
-
-    let reply =
-      data.output_text ||
-      data.output?.[0]?.content?.[0]?.text ||
-      "AI response not available";
-
-    res.json({ reply });
-
-  } catch (err) {
-    console.error("Chat API failed:", err);
-    res.json({ reply: "AI service temporarily unavailable" });
-  }
-});
-
 // -------------------------
-// TTS Endpoint (Streaming + Fallback)
+// TTS Endpoint with fallback
 // -------------------------
+let ttsEnabled = true;
+
 app.post("/api/tts", async (req, res) => {
   const { text, language } = req.body;
 
   if (!text) {
     return res.json({
       fallback: true,
-      message: "No text provided for TTS",
+      message: "No text provided for TTS"
     });
   }
 
   if (!ttsEnabled) {
     return res.json({
       fallback: true,
-      message: "TTS quota exceeded. Use browser TTS.",
+      message: "TTS quota exceeded. Use browser TTS."
     });
   }
 
@@ -139,33 +108,28 @@ app.post("/api/tts", async (req, res) => {
 
     if (!ttsRes.ok) {
       console.error("ElevenLabs TTS failed:", await ttsRes.text());
-      disableTTSWithRetry();
-
+      ttsEnabled = false;
       return res.json({
         fallback: true,
-        message: "TTS temporarily unavailable. Use browser TTS.",
+        message: "TTS temporarily unavailable. Use browser TTS."
       });
     }
 
-    // 🔊 STREAM AUDIO
+    const audioBuffer = await ttsRes.arrayBuffer();
     res.set("Content-Type", "audio/mpeg");
-    ttsRes.body.pipe(res);
-
+    res.send(Buffer.from(audioBuffer));
   } catch (err) {
     console.error("TTS request failed:", err);
-    disableTTSWithRetry();
-
+    ttsEnabled = false;
     res.json({
       fallback: true,
-      message: "TTS service unavailable. Use browser TTS.",
+      message: "TTS service unavailable. Use browser TTS."
     });
   }
 });
 
 // -------------------------
-// Start Server
+// Start server
 // -------------------------
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () =>
-  console.log(`Backend running on port ${PORT}`)
-);
+app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
