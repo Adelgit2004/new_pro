@@ -41,26 +41,41 @@ app.post("/api/chat", async (req, res) => {
     return res.json({ reply: "Please enter a message" });
   }
 
-  const prompt =
-    language === "Malayalam"
-      ? `Translate Malayalam to English and reply naturally: ${message}`
-      : `Reply naturally in ${language}: ${message}`;
-
   try {
-    const openaiRes = await fetch(
-      "https://api.openai.com/v1/responses",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4.1-mini",
-          input: prompt,
-        }),
-      }
-    );
+    const prompt =
+      language === "Malayalam"
+        ? `Translate Malayalam to English and reply naturally: ${message}`
+        : `Reply naturally in ${language}: ${message}`;
+
+    const openaiRes = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4.1-mini",
+        input: prompt,
+      }),
+    });
+
+    const data = await openaiRes.json();
+
+    let reply = "AI response not available";
+
+    if (data.error) {
+      console.error("OpenAI error:", data.error);
+      reply = "AI service temporarily unavailable";
+    } else {
+      reply = data.output_text || reply;
+    }
+
+    res.json({ reply });
+  } catch (err) {
+    console.error("Chat API failed:", err);
+    res.json({ reply: "AI service temporarily unavailable" });
+  }
+});
 
     const data = await openaiRes.json();
 
