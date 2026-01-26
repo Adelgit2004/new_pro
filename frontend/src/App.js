@@ -12,7 +12,7 @@ export default function App() {
   const [reply, setReply] = useState("");
   const [language, setLanguage] = useState("English");
 
-  const backendURL = "https://new-pro-28.onrender.com" // Replace with deployed backend
+  const backendURL = "https://new-pro-32.onrender.com" // Replace with deployed backend
 
   const sendToAI = async () => {
     try {
@@ -30,37 +30,45 @@ export default function App() {
     }
   };
 
-  const speakAI = async (aiText) => {
-    try {
-      const res = await fetch(`${backendURL}/api/tts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: aiText, language }),
-      });
+ const speakAI = async (aiText) => {
+  try {
+    const res = await fetch(`${backendURL}/api/tts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: aiText, language }),
+    });
 
-      if (!res.ok) {
-        // Fallback to browser TTS
-        const reader = new SpeechSynthesisUtterance(aiText);
-        reader.lang = language === "Malayalam" ? "ml-IN" :
-                      language === "Hindi" ? "hi-IN" :
-                      language === "Spanish" ? "es-ES" : "en-US";
-        window.speechSynthesis.speak(reader);
-        return;
-      }
+    const contentType = res.headers.get("content-type");
 
+    if (contentType && contentType.includes("audio")) {
+      // 🔊 ElevenLabs audio
       const blob = await res.blob();
       const audio = new Audio(URL.createObjectURL(blob));
       audio.play();
-    } catch (err) {
-      console.error("TTS Error:", err);
-      // fallback to browser TTS
+    } else {
+      // 🗣️ Browser TTS fallback
       const reader = new SpeechSynthesisUtterance(aiText);
-      reader.lang = language === "Malayalam" ? "ml-IN" :
-                    language === "Hindi" ? "hi-IN" :
-                    language === "Spanish" ? "es-ES" : "en-US";
+      reader.lang =
+        language === "Malayalam" ? "ml-IN" :
+        language === "Hindi" ? "hi-IN" :
+        language === "Spanish" ? "es-ES" : "en-US";
+
       window.speechSynthesis.speak(reader);
     }
-  };
+  } catch (err) {
+    console.error("TTS Error:", err);
+
+    // 🗣️ Emergency fallback
+    const reader = new SpeechSynthesisUtterance(aiText);
+    reader.lang =
+      language === "Malayalam" ? "ml-IN" :
+      language === "Hindi" ? "hi-IN" :
+      language === "Spanish" ? "es-ES" : "en-US";
+
+    window.speechSynthesis.speak(reader);
+  }
+};
+
 
   return (
     <div style={{ padding: 20, maxWidth: 500 }}>
